@@ -10,10 +10,15 @@ MODES=("release" "debug" "factory")
 
 INIT_PATH=$PATH
 
-# Source directories
-# Default OpenSBI tree; a board config can pick another one with opensbi.src.
+# Source directories (defaults). These may be overridden per board via the
+# optional yaml keys opensbi.src / uboot.src, see resolve_src_dirs().
 OPENSBI_DIR="${ROOT}/pi-opensbi"
 UBOOT_DIR="${ROOT}/pi-u-boot"
+
+# Defaults kept verbatim so resolve_src_dirs() can fall back to them when a
+# board config does not set opensbi.src / uboot.src (i.e. the K1 case).
+OPENSBI_DIR_DEFAULT="${OPENSBI_DIR}"
+UBOOT_DIR_DEFAULT="${UBOOT_DIR}"
 
 function pushd {
     command pushd "$@" > /dev/null
@@ -48,26 +53,28 @@ function check_local_changes {
     done
 }
 
-# RISC-V toolchain - use bootlin toolchain (glibc, stable)
-# Using 2023.11-1 for better glibc compatibility (requires glibc 2.31+)
-RISCV_TOOLCHAIN_VERSION="2023.11-1"
-RISCV_TOOLCHAIN_NAME="riscv64-lp64d--glibc--stable-${RISCV_TOOLCHAIN_VERSION}"
-RISCV_TOOLCHAIN_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/riscv64-lp64d/tarballs/${RISCV_TOOLCHAIN_NAME}.tar.bz2"
+# RISC-V toolchain - use the official SpacemiT BSP toolchain (glibc, x86_64 host).
+# v1.2.4 ships GCC 15.2.0 -- the exact compiler the SpacemiT K3 vendor BSP is
+# built with, so U-Boot/OpenSBI codegen matches the vendor. Runs on glibc 2.35+.
+# Triplet is riscv64-unknown-linux-gnu-. Tarball is .tar.xz.
+RISCV_TOOLCHAIN_VERSION="v1.2.4"
+RISCV_TOOLCHAIN_NAME="spacemit-toolchain-linux-glibc-x86_64-${RISCV_TOOLCHAIN_VERSION}"
+RISCV_TOOLCHAIN_URL="http://archive.spacemit.com/toolchain/${RISCV_TOOLCHAIN_NAME}.tar.xz"
 
 # Buildroot toolchain path (if available)
 BUILDROOT_TOOLCHAIN="/srv/spacemit/buildroot/output/k1_v2/host/bin"
 
 # Download and extract RISC-V toolchain
 function download_riscv64_toolchain {
-    local toolchain_dir="${TOOLCHAINS}/riscv64-lp64d--glibc--stable-${RISCV_TOOLCHAIN_VERSION}"
-    local tarball="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}.tar.bz2"
+    local toolchain_dir="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}"
+    local tarball="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}.tar.xz"
 
     if [ -d "${toolchain_dir}" ]; then
         echo "RISC-V toolchain already exists at ${toolchain_dir}"
         return 0
     fi
 
-    echo "Downloading RISC-V toolchain from Bootlin (${RISCV_TOOLCHAIN_VERSION})..."
+    echo "Downloading RISC-V toolchain from SpacemiT (${RISCV_TOOLCHAIN_VERSION})..."
     mkdir -p "${TOOLCHAINS}"
 
     if ! command -v wget &> /dev/null && ! command -v curl &> /dev/null; then
@@ -81,7 +88,7 @@ function download_riscv64_toolchain {
     fi
 
     echo "Extracting toolchain..."
-    tar -xjf "${tarball}" -C "${TOOLCHAINS}"
+    tar -xJf "${tarball}" -C "${TOOLCHAINS}"
 
     rm -f "${tarball}"
     echo "RISC-V toolchain installed to ${toolchain_dir}"
@@ -100,7 +107,7 @@ function check_toolchain_works {
 
 # RISC-V 64-bit cross-compiler
 function riscv64_env {
-    local toolchain_dir="${TOOLCHAINS}/riscv64-lp64d--glibc--stable-${RISCV_TOOLCHAIN_VERSION}"
+    local toolchain_dir="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}"
 
     # Try system toolchain first
     if command -v riscv64-linux-gnu-gcc &> /dev/null; then
@@ -131,22 +138,22 @@ function riscv64_env {
         fi
     fi
 
-    # Try downloaded bootlin toolchain
+    # Try downloaded SpacemiT toolchain
     if [ -d "${toolchain_dir}/bin" ]; then
-        if check_toolchain_works "${toolchain_dir}/bin/riscv64-buildroot-linux-gnu-gcc"; then
+        if check_toolchain_works "${toolchain_dir}/bin/riscv64-unknown-linux-gnu-gcc"; then
             export PATH="${toolchain_dir}/bin:$PATH"
-            export CROSS_COMPILE=riscv64-buildroot-linux-gnu-
+            export CROSS_COMPILE=riscv64-unknown-linux-gnu-
             export ARCH=riscv
             return
         fi
     fi
 
     # Download toolchain
-    echo "RISC-V toolchain not found or incompatible, downloading Bootlin toolchain..."
+    echo "RISC-V toolchain not found or incompatible, downloading SpacemiT toolchain..."
     download_riscv64_toolchain
     if [ -d "${toolchain_dir}/bin" ]; then
         export PATH="${toolchain_dir}/bin:$PATH"
-        export CROSS_COMPILE=riscv64-buildroot-linux-gnu-
+        export CROSS_COMPILE=riscv64-unknown-linux-gnu-
         export ARCH=riscv
     else
         error_exit "Failed to setup RISC-V toolchain"
@@ -154,7 +161,7 @@ function riscv64_env {
 }
 
 function check_riscv64 {
-    local toolchain_dir="${TOOLCHAINS}/riscv64-lp64d--glibc--stable-${RISCV_TOOLCHAIN_VERSION}"
+    local toolchain_dir="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}"
 
     # Check if RISC-V toolchain exists
     if command -v riscv64-linux-gnu-gcc &> /dev/null; then
@@ -210,6 +217,39 @@ function check_env {
 function config_value {
     local value=$(cat "$1" | shyaml --quiet get-value "$2" 2>/dev/null)
     echo "${value}"
+}
+
+# Resolve OPENSBI_DIR / UBOOT_DIR from the board config.
+#
+# A board yaml may set optional keys opensbi.src / uboot.src pointing at the
+# source tree to build (absolute, or relative to ROOT = build-bootloaders/..).
+# When a key is absent the historical default is kept (pi-opensbi / pi-u-boot),
+# so the K1 config is unaffected. Both variables are exported so the helper
+# scripts sourced later (prepare_android_img.sh) observe the same values.
+function resolve_src_dirs {
+    local config="$1"
+    local opensbi_src=$(config_value "${config}" opensbi.src)
+    local uboot_src=$(config_value "${config}" uboot.src)
+
+    if [ -n "${opensbi_src}" ]; then
+        case "${opensbi_src}" in
+            /*) OPENSBI_DIR="${opensbi_src}" ;;
+            *)  OPENSBI_DIR="${ROOT}/${opensbi_src}" ;;
+        esac
+    else
+        OPENSBI_DIR="${OPENSBI_DIR_DEFAULT}"
+    fi
+
+    if [ -n "${uboot_src}" ]; then
+        case "${uboot_src}" in
+            /*) UBOOT_DIR="${uboot_src}" ;;
+            *)  UBOOT_DIR="${ROOT}/${uboot_src}" ;;
+        esac
+    else
+        UBOOT_DIR="${UBOOT_DIR_DEFAULT}"
+    fi
+
+    export OPENSBI_DIR UBOOT_DIR
 }
 
 function board_name {

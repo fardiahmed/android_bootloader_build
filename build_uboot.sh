@@ -19,6 +19,10 @@ function build_uboot {
     local mode="${3:-release}"
     local out_dir=$(out_dir "${config}" "${mode}")
 
+    # Pick the U-Boot / OpenSBI source trees (uboot.src / opensbi.src
+    # overrides, else pi-u-boot / pi-opensbi)
+    resolve_src_dirs "${config}"
+
     display_current_build "${config}" "uboot" "${mode}"
 
     # Get config values
@@ -63,10 +67,13 @@ function build_uboot {
         make olddefconfig
     fi
 
-    # For Android builds: override the board .env bootcmd
+    # For Android builds: override the board .env bootcmd (K1 / k1-x only).
     # The board k1-x.env sets bootcmd=run autoboot (legacy Linux boot).
     # Android needs bootcmd=bootflow scan -lb (BOOTSTD Android bootmeth).
-    if [ "${has_android_fragment}" = true ]; then
+    # Upstream trees (e.g. K3) drive BOOTSTD/bootmeth_android from the
+    # defconfig itself and ship no k1-x.env, so this patch is skipped there.
+    if [ "${has_android_fragment}" = true ] \
+       && [ -f "${UBOOT_DIR}/board/spacemit/k1-x/k1-x.env" ]; then
         local board_env="${UBOOT_DIR}/board/spacemit/k1-x/k1-x.env"
         local android_env="${SRC}/config/env_android.txt"
         if [ -f "${board_env}" ] && [ -f "${android_env}" ]; then
@@ -155,6 +162,25 @@ ANDROID_ENV
     if [ -f "spl/u-boot-spl.bin" ]; then
         cp "spl/u-boot-spl.bin" "${out_dir}/u-boot-spl-${mode}.bin"
         echo "U-Boot SPL built: ${out_dir}/u-boot-spl-${mode}.bin"
+    fi
+
+    # Stage BootROM-loadable factory blobs into out_dir/factory so that
+    # copy_binaries() (release_android.sh) ships them to AOSP. Trees whose
+    # board config.mk wraps the SPL into an AIHD-headered FSBL.bin plus
+    # per-medium bootinfo descriptors (e.g. K3 board/spacemit/k3/config.mk)
+    # emit these at the U-Boot top level during `make`. Existence-guarded, so
+    # trees that do not produce them are unaffected.
+    if [ -f "FSBL.bin" ] || compgen -G "bootinfo_*.bin" > /dev/null; then
+        mkdir -p "${out_dir}/factory"
+        if [ -f "FSBL.bin" ]; then
+            cp -f "FSBL.bin" "${out_dir}/factory/"
+        fi
+        for bootinfo in bootinfo_*.bin; do
+            if [ -f "${bootinfo}" ]; then
+                cp -f "${bootinfo}" "${out_dir}/factory/"
+            fi
+        done
+        echo "Factory blobs staged: ${out_dir}/factory/"
     fi
 
     # Generate environment binary

@@ -41,15 +41,20 @@ function prepare_factory_files {
         error_exit "FSBL.bin not found in ${UBOOT_DIR}"
     fi
 
-    # Copy bootinfo files
+    # Copy bootinfo files. The exact set is board-specific: K1 emits
+    # bootinfo_{spinor,spinand,emmc,sd}.bin, K3 emits
+    # bootinfo_{spinor,spinand,block}.bin. Require at least one rather than a
+    # specific medium so the step is not tied to a single SoC.
+    local bootinfo_count=0
     for bootinfo in "${UBOOT_DIR}"/bootinfo_*.bin; do
         if [ -f "${bootinfo}" ]; then
             cp -f "${bootinfo}" "${factory_dir}/"
+            bootinfo_count=$((bootinfo_count + 1))
         fi
     done
 
-    if [ ! -f "${factory_dir}/bootinfo_sd.bin" ]; then
-        error_exit "bootinfo_sd.bin not found"
+    if [ "${bootinfo_count}" -eq 0 ]; then
+        error_exit "no bootinfo_*.bin found in ${UBOOT_DIR}"
     fi
 
     echo "Factory files prepared in ${factory_dir}"
@@ -333,6 +338,13 @@ function prepare_android_images {
 
     if [ -z "${out_dir}" ]; then
         out_dir=$(out_dir "${config}" "${mode}")
+    fi
+
+    # Pick the U-Boot source tree (uboot.src override, else pi-u-boot) so the
+    # factory blobs are read from the right tree. resolve_src_dirs may already
+    # have run in build_uboot; calling it again is idempotent.
+    if type -t resolve_src_dirs &>/dev/null; then
+        resolve_src_dirs "${config}"
     fi
 
     echo "============================================"

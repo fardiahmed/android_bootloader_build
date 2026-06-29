@@ -1,0 +1,26 @@
+plat: spacemit
+
+# Upstream U-Boot 2026.07 + OpenSBI port for the SpacemiT K3 (X100).
+# Unlike the K1 board (which builds the in-tree pi-u-boot / pi-opensbi forks),
+# K3 builds dedicated source trees selected via the opensbi.src / uboot.src
+# keys below. Paths are relative to the build-bootloaders ROOT
+# (i.e. /srv/spacemit/k3/bootloaders), or absolute.
+
+opensbi:
+  src: opensbi
+  platform: generic
+  # The upstream generic defconfig already enables CONFIG_PLATFORM_SPACEMIT_K3.
+  defconfig: defconfig
+
+uboot:
+  src: u-boot
+  defconfig: k3_defconfig
+  defconfig_fragments: k3_android.config
+
+android:
+  binaries_path: vendor/spacemit/k3/bootloader
+
+# K3 defconfig has no AVB/Android-boot support yet (pure FIT boot); disable the
+# factory-mode AVB key injection until the Android-boot bring-up lands.
+secure:
+  avb: false
