@@ -137,6 +137,24 @@ ANDROID_ENV
         opensbi_flag="OPENSBI=${OPENSBI_DIR}/build/platform/generic/firmware/fw_dynamic.bin"
     fi
 
+    # Stage the RCPU (ESOS) blobs binman packs into u-boot.itb as loadables;
+    # the SPL starts the RCPUs before OpenSBI so a live RPMI agent answers
+    # the MPXY device-power probe. Gated on the freshly generated .config so
+    # non-K3 builds are unaffected; missing blobs fail loud.
+    if grep -q '^CONFIG_SPL_REMOTEPROC_K3_PROC=y' .config 2>/dev/null; then
+        local rcpu_dir="${SRC}/prebuilts/rcpu"
+        local rcpu_blob
+        for rcpu_blob in rt24_os0_rcpu.elf rt24_os1_rcpu.elf \
+                         k3_rt240_pico_itx.dtb k3_rt241_pico_itx.dtb \
+                         rcpu-data-null.bin; do
+            if [ ! -f "${rcpu_dir}/${rcpu_blob}" ]; then
+                error_exit "Missing RCPU blob: ${rcpu_dir}/${rcpu_blob}"
+            fi
+            cp -f "${rcpu_dir}/${rcpu_blob}" .
+        done
+        echo "RCPU ESOS blobs staged from ${rcpu_dir}"
+    fi
+
     # Build U-Boot
     make ${opensbi_flag} -j$(nproc)
 

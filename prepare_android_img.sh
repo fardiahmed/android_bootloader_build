@@ -57,6 +57,14 @@ function prepare_factory_files {
         error_exit "no bootinfo_*.bin found in ${UBOOT_DIR}"
     fi
 
+    # Optional EC RW firmware (K3 Pico-ITX CrosEC, flashed via "oem ec:flash").
+    # Board-agnostic and best-effort: only staged when the source blob exists.
+    local ec_bin="${EC_BIN:-${ROOT}/../k3-buildroot-sdk/buildroot-ext/board/spacemit/k3/ec.bin}"
+    if [ -f "${ec_bin}" ]; then
+        cp -f "${ec_bin}" "${factory_dir}/ec.bin"
+        echo "Staged EC firmware ${ec_bin}"
+    fi
+
     echo "Factory files prepared in ${factory_dir}"
 }
 
