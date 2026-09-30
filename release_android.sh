@@ -59,6 +59,7 @@ function copy_binaries {
     fi
     [ -f "${out}/partition_android.json" ] && cp -f "${out}/partition_android.json" "${android_out}/"
     [ -f "${out}/partition_nor.json" ]     && cp -f "${out}/partition_nor.json"     "${android_out}/"
+    # logo.bmp comes from device/spacemit/k1 (copied by its Android.mk).
 }
 
 function usage {
@@ -145,7 +146,10 @@ function main {
             copy_binaries "${out_dir}" "${aosp}/${binaries_path}" "${mode}"
         done
         commit_title_prefix=$(board_name ${board_config})
-        add_commit_msg commits_msg "${commit_title_prefix}" "${aosp}/${binaries_path}"
+        # Without --commit the binaries are build outputs (AOSP build.sh): no commit bookkeeping.
+        if [[ "${commit}" == true ]]; then
+            add_commit_msg commits_msg "${commit_title_prefix}" "${aosp}/${binaries_path}"
+        fi
 
     done
     popd
