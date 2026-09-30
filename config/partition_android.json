@@ -129,6 +129,12 @@
             "description": "Persistent data partition"
         },
         {
+            "name": "logo",
+            "size": "24M",
+            "image": "logo.bmp",
+            "description": "U-Boot splash screen BMP, read raw by board/spacemit/k1-x/splash.c"
+        },
+        {
             "name": "super",
             "offset": "256M",
             "size": "4608M",
