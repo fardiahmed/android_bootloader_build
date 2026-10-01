@@ -11,6 +11,7 @@ MODES=("release" "debug" "factory")
 INIT_PATH=$PATH
 
 # Source directories
+# Default OpenSBI tree; a board config can pick another one with opensbi.src.
 OPENSBI_DIR="${ROOT}/pi-opensbi"
 UBOOT_DIR="${ROOT}/pi-u-boot"
 

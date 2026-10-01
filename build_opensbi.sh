@@ -20,6 +20,8 @@ function build_opensbi {
 
     # Get config values
     local platform=$(config_value "${config}" opensbi.platform)
+    local src=$(config_value "${config}" opensbi.src)
+    [ -n "${src}" ] && OPENSBI_DIR="${ROOT}/${src}"
     local extra_flags=$(config_value "${config}" opensbi.flags)
 
     # Default platform for Spacemit K1

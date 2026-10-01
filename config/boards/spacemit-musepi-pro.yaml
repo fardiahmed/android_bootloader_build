@@ -18,8 +18,10 @@
 plat: spacemit
 
 opensbi:
+  # Upstream OpenSBI with the RISE OP-TEE (MPXY/RPMI) work; K1 support is in the generic platform.
+  src: opensbi
   platform: generic
-  defconfig: k1_defconfig
+  defconfig: defconfig
 
 uboot:
   defconfig: k1_defconfig

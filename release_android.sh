@@ -9,7 +9,7 @@ source "${SRC}/build_all.sh"
 source "${SRC}/commit-binaries.sh"
 
 # SpacemiT K1 projects in this repo tree
-PROJECTS_AIOT=("pi-opensbi" "pi-u-boot" "build-bootloaders")
+PROJECTS_AIOT=("opensbi" "pi-u-boot" "build-bootloaders")
 PROJECTS_REMOTES="spacemit github"
 
 function add_commit_msg {
