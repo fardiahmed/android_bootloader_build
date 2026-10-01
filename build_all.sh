@@ -11,6 +11,7 @@ fi
 source "${SRC}/secure.sh"
 source "${SRC}/prepare_android_img.sh"
 source "${SRC}/build_opensbi.sh"
+source "${SRC}/build_optee.sh"
 source "${SRC}/build_uboot.sh"
 
 function build_all {
@@ -23,8 +24,9 @@ function build_all {
         rm -rf "${out_dir}"
     fi
 
-    # SpacemiT K1 boot chain: OpenSBI -> U-Boot -> Android flash images
+    # SpacemiT K1 boot chain: OpenSBI -> (OP-TEE) -> U-Boot -> Android flash images
     build_opensbi "${config}" "${clean}" "${mode}"
+    build_optee "${config}" "${clean}" "${mode}"
     build_uboot "${config}" "${clean}" "${mode}"
     prepare_android_images "${config}" "${mode}" "${out_dir}" "false"
 

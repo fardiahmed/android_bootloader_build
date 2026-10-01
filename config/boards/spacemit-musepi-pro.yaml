@@ -23,6 +23,10 @@ opensbi:
   platform: generic
   defconfig: defconfig
 
+optee:
+  # optee_os core/arch/riscv/plat-spacemit; loaded by SPL from u-boot.itb, see k1-x-optee.dtsi
+  platform: spacemit-k1
+
 uboot:
   defconfig: k1_defconfig
   defconfig_fragments: k1_android.config
