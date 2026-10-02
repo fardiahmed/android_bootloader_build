@@ -144,14 +144,13 @@ ANDROID_ENV
     if grep -q '^CONFIG_SPL_REMOTEPROC_K3_PROC=y' .config 2>/dev/null; then
         local rcpu_dir="${SRC}/prebuilts/rcpu"
         local rcpu_blob
-        for rcpu_blob in rt24_os0_rcpu.elf rt24_os1_rcpu.elf \
-                         k3_rt240_pico_itx.dtb k3_rt241_pico_itx.dtb \
-                         rcpu-data-null.bin; do
+        for rcpu_blob in rt24_os0_rcpu.elf rt24_os1_rcpu.elf rcpu-data-null.bin; do
             if [ ! -f "${rcpu_dir}/${rcpu_blob}" ]; then
                 error_exit "Missing RCPU blob: ${rcpu_dir}/${rcpu_blob}"
             fi
-            cp -f "${rcpu_dir}/${rcpu_blob}" .
         done
+        # The firmware plus the ESOS dtbs of every board; the board's -u-boot.dtsi picks its own
+        cp -f "${rcpu_dir}"/*.elf "${rcpu_dir}"/*.dtb "${rcpu_dir}"/*.bin .
         echo "RCPU ESOS blobs staged from ${rcpu_dir}"
     fi
 

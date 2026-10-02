@@ -14,6 +14,11 @@ Provenance: SpacemiT vendor SDK build output (2026-06-19),
   lzo-decompressed): `dumpimage -T flat_dt -p 19 -o x.lzo esos.itb && lzop -d`.
   Their `/model` ("k3-pico-itx") must match the product name the SPL writes
   into the `rcpu-data-null` slot (TLV EEPROM).
+- `k3_rt240_com260_kit_v02.dtb`, `k3_rt241_com260_kit_v02.dtb` — ESOS dtbs for the
+  K3-CoM260 kit V02 carrier (Banana Pi BPI-SM10), `/model` "k3_com260_kit_v02", images
+  13/14 of the `esos.itb` in SpacemiT's Buildroot-K3-v1.0.0-20260430110238 release
+  (archive.spacemit.com/image/k3/version/buildroot/v1.0.0/), extracted the same way.
+  That release predates the firmware ELFs above (SDK 2026-06-19).
 - `rcpu-data-null.bin` — 64 zero bytes; placeholder for the product-name
   slot at 0x1_00F00000 (the SPL FIT hook overwrites it at load time).
 
