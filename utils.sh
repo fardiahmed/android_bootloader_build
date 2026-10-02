@@ -53,13 +53,24 @@ function check_local_changes {
     done
 }
 
-# RISC-V toolchain - use the official SpacemiT BSP toolchain (glibc, x86_64 host).
-# v1.2.4 ships GCC 15.2.0 -- the exact compiler the SpacemiT K3 vendor BSP is
-# built with, so U-Boot/OpenSBI codegen matches the vendor. Runs on glibc 2.35+.
-# Triplet is riscv64-unknown-linux-gnu-. Tarball is .tar.xz.
-RISCV_TOOLCHAIN_VERSION="v1.2.4"
-RISCV_TOOLCHAIN_NAME="spacemit-toolchain-linux-glibc-x86_64-${RISCV_TOOLCHAIN_VERSION}"
-RISCV_TOOLCHAIN_URL="http://archive.spacemit.com/toolchain/${RISCV_TOOLCHAIN_NAME}.tar.xz"
+# RISC-V toolchain, per board (toolchain key, see select_toolchain): bootlin (default, the
+# K1 boards) or spacemit (SpacemiT BSP GCC 15.2, as the K3 vendor BSP is built).
+function select_toolchain {
+    local toolchain=""
+    [ -n "${1:-}" ] && toolchain=$(config_value "$1" toolchain)
+    if [ "${toolchain}" = "spacemit" ]; then
+        RISCV_TOOLCHAIN_VERSION="v1.2.4"
+        RISCV_TOOLCHAIN_NAME="spacemit-toolchain-linux-glibc-x86_64-${RISCV_TOOLCHAIN_VERSION}"
+        RISCV_TOOLCHAIN_URL="http://archive.spacemit.com/toolchain/${RISCV_TOOLCHAIN_NAME}.tar.xz"
+        RISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
+    else
+        RISCV_TOOLCHAIN_VERSION="2023.11-1"
+        RISCV_TOOLCHAIN_NAME="riscv64-lp64d--glibc--stable-${RISCV_TOOLCHAIN_VERSION}"
+        RISCV_TOOLCHAIN_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/riscv64-lp64d/tarballs/${RISCV_TOOLCHAIN_NAME}.tar.bz2"
+        RISCV_TOOLCHAIN_PREFIX="riscv64-buildroot-linux-gnu-"
+    fi
+}
+select_toolchain
 
 # Buildroot toolchain path (if available)
 BUILDROOT_TOOLCHAIN="/srv/spacemit/buildroot/output/k1_v2/host/bin"
@@ -67,14 +78,14 @@ BUILDROOT_TOOLCHAIN="/srv/spacemit/buildroot/output/k1_v2/host/bin"
 # Download and extract RISC-V toolchain
 function download_riscv64_toolchain {
     local toolchain_dir="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}"
-    local tarball="${TOOLCHAINS}/${RISCV_TOOLCHAIN_NAME}.tar.xz"
+    local tarball="${TOOLCHAINS}/$(basename "${RISCV_TOOLCHAIN_URL}")"
 
     if [ -d "${toolchain_dir}" ]; then
         echo "RISC-V toolchain already exists at ${toolchain_dir}"
         return 0
     fi
 
-    echo "Downloading RISC-V toolchain from SpacemiT (${RISCV_TOOLCHAIN_VERSION})..."
+    echo "Downloading RISC-V toolchain ${RISCV_TOOLCHAIN_NAME}..."
     mkdir -p "${TOOLCHAINS}"
 
     if ! command -v wget &> /dev/null && ! command -v curl &> /dev/null; then
@@ -88,7 +99,7 @@ function download_riscv64_toolchain {
     fi
 
     echo "Extracting toolchain..."
-    tar -xJf "${tarball}" -C "${TOOLCHAINS}"
+    tar -xaf "${tarball}" -C "${TOOLCHAINS}"
 
     rm -f "${tarball}"
     echo "RISC-V toolchain installed to ${toolchain_dir}"
@@ -138,22 +149,22 @@ function riscv64_env {
         fi
     fi
 
-    # Try downloaded SpacemiT toolchain
+    # Try the downloaded toolchain of this board
     if [ -d "${toolchain_dir}/bin" ]; then
-        if check_toolchain_works "${toolchain_dir}/bin/riscv64-unknown-linux-gnu-gcc"; then
+        if check_toolchain_works "${toolchain_dir}/bin/${RISCV_TOOLCHAIN_PREFIX}gcc"; then
             export PATH="${toolchain_dir}/bin:$PATH"
-            export CROSS_COMPILE=riscv64-unknown-linux-gnu-
+            export CROSS_COMPILE=${RISCV_TOOLCHAIN_PREFIX}
             export ARCH=riscv
             return
         fi
     fi
 
     # Download toolchain
-    echo "RISC-V toolchain not found or incompatible, downloading SpacemiT toolchain..."
+    echo "RISC-V toolchain not found or incompatible, downloading ${RISCV_TOOLCHAIN_NAME}..."
     download_riscv64_toolchain
     if [ -d "${toolchain_dir}/bin" ]; then
         export PATH="${toolchain_dir}/bin:$PATH"
-        export CROSS_COMPILE=riscv64-unknown-linux-gnu-
+        export CROSS_COMPILE=${RISCV_TOOLCHAIN_PREFIX}
         export ARCH=riscv
     else
         error_exit "Failed to setup RISC-V toolchain"
@@ -228,6 +239,7 @@ function config_value {
 # scripts sourced later (prepare_android_img.sh) observe the same values.
 function resolve_src_dirs {
     local config="$1"
+    select_toolchain "${config}"
     local opensbi_src=$(config_value "${config}" opensbi.src)
     local uboot_src=$(config_value "${config}" uboot.src)
 

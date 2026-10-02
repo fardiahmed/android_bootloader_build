@@ -1,5 +1,8 @@
 plat: spacemit
 
+# SpacemiT BSP toolchain (GCC 15.2), as the K3 vendor bootloaders are built
+toolchain: spacemit
+
 # Upstream U-Boot 2026.07 + OpenSBI port for the SpacemiT K3 (X100).
 # Unlike the K1 board (which builds the in-tree pi-u-boot / pi-opensbi forks),
 # K3 builds dedicated source trees selected via the opensbi.src / uboot.src
