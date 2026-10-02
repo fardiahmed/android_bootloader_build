@@ -148,6 +148,7 @@ EOF
 
 function copy_partition_configs {
     local out_dir="$1"
+    local nor_layout="${2:-partition_nor.json}"
 
     echo "Copying partition configurations..."
 
@@ -156,9 +157,9 @@ function copy_partition_configs {
         cp -f "${CONFIG_DIR}/partition_android.json" "${out_dir}/"
     fi
 
-    # Copy SPI-NOR bootloader layout (MTD) for NOR-boot boards (MUSE-Pi-Pro)
-    if [ -f "${CONFIG_DIR}/partition_nor.json" ]; then
-        cp -f "${CONFIG_DIR}/partition_nor.json" "${out_dir}/"
+    # Copy SPI-NOR bootloader layout (MTD) for NOR-boot boards (MUSE-Pi-Pro, K3)
+    if [ -f "${CONFIG_DIR}/${nor_layout}" ]; then
+        cp -f "${CONFIG_DIR}/${nor_layout}" "${out_dir}/partition_nor.json"
     fi
 
     # Create size-based partition links for fastboot
@@ -372,7 +373,9 @@ function prepare_android_images {
     create_fw_dynamic_itb "${out_dir}"
 
     # Copy partition configs
-    copy_partition_configs "${out_dir}"
+    # android.partition_nor: the board's SPI-NOR layout (K1 by default)
+    local nor_layout=$(config_value "${config}" android.partition_nor)
+    copy_partition_configs "${out_dir}" "${nor_layout:-partition_nor.json}"
 
     # Create fastboot.yaml
     create_fastboot_yaml "${out_dir}"

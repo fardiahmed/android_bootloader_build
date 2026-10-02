@@ -19,6 +19,7 @@ uboot:
 
 android:
   binaries_path: vendor/spacemit/k3/bootloader
+  partition_nor: partition_nor_k3.json
 
 # K3 defconfig has no AVB/Android-boot support yet (pure FIT boot); disable the
 # factory-mode AVB key injection until the Android-boot bring-up lands.
