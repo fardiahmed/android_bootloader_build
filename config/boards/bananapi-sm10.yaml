@@ -1,0 +1,24 @@
+# Banana Pi BPI-SM10: SpacemiT K3-CoM260 module on the CoM260 kit V02 carrier. Same K3
+# trees and toolchain as the Pico-ITX (spacemit-k3.yaml), with the SM10 device tree.
+
+plat: spacemit
+
+# SpacemiT BSP toolchain (GCC 15.2), as the K3 vendor bootloaders are built
+toolchain: spacemit
+
+opensbi:
+  src: k3-opensbi
+  platform: generic
+  defconfig: defconfig
+
+uboot:
+  src: k3-u-boot
+  defconfig: k3_defconfig
+  defconfig_fragments: k3_android.config k3_bananapi_sm10.config
+
+android:
+  binaries_path: vendor/spacemit/k3/bootloader
+  partition_nor: partition_nor_k3.json
+
+secure:
+  avb: false
